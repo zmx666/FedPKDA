@@ -5,7 +5,7 @@ import random
 import torch
 import torchvision
 import torchvision.transforms as transforms
-from utils.dataset_utils import check, separate_data, split_data, save_file,separate_data_label_disjoint_non_iid
+from utils.dataset_utils import check, separate_data, split_data, save_file
 
 
 random.seed(1)
