@@ -47,6 +47,10 @@ def run(args):
             else:
                 args.model = FedAvgCNN(in_features=3, num_classes=args.num_classes, dim=10816).to(args.device)
 
+        elif model_str == "resnet18":
+            from flcore.trainmodel.resnet import resnet18
+            args.model = resnet18(num_classes=args.num_classes).to(args.device)
+
         else:
             raise NotImplementedError
 
