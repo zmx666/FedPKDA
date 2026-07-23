@@ -28,7 +28,6 @@ pip install -r requirements.txt
 cd dataset && python generate_Flowers102.py
 # or you can run this => python generate_cifar100.py  
 # It depends on what dataset you would like to use, and Flowers102 is default dataset
-python 
 ```
 
 - run the train process with default configuration
@@ -36,6 +35,8 @@ python
 ```bash
 cd system
 python main.py
+# Or you can choose recored the std out at the same time
+# python -u main.py | tee ../results/FedAvg.log
 ```
 
 ---
