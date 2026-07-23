@@ -1,0 +1,4 @@
+__pycache__/
+Cifar100/
+Flowers102/
+results/*
