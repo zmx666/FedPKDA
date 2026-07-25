@@ -47,6 +47,17 @@ def run(args):
             else:
                 args.model = FedAvgCNN(in_features=3, num_classes=args.num_classes, dim=10816).to(args.device)
 
+        elif model_str == "dnn":
+            if "NSLKDD" in args.dataset:
+                args.model = DNN(input_dim=41, mid_dim=200, num_classes=args.num_classes).to(args.device)
+            else:
+                args.model = DNN(num_classes=args.num_classes).to(args.device)
+        elif model_str == "mlp":
+            if "NSLKDD" in args.dataset:
+                args.model = FedAvgMLP(in_features=41, num_classes=args.num_classes, hidden_dim=200).to(args.device)
+            else:
+                args.model = FedAvgMLP(num_classes=args.num_classes).to(args.device)
+
         elif model_str == "resnet18":
             from flcore.trainmodel.resnet import resnet18
             args.model = resnet18(num_classes=args.num_classes).to(args.device)
