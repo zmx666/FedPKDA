@@ -1,11 +1,16 @@
 dataset,algorithm,goal,run,rounds,best_acc_pct,best_round,last5_acc_pct,final_acc_pct,final_train_loss,best_acc_std_pct
+Cifar100,FedAvg,cifar100_fedavg_cnn,0,41,27.8718,34,27.4813,27.4320,2.2550,-
 Cifar100,Fedpkda,cifar100_fedpkda_lp0.3_gp0.5,0,41,45.2892,40,44.7548,45.2892,1.1168,-
 Cifar100,Fedpkda,cifar100_fedpkda_lp0.6_gp0.3,0,41,45.2425,40,44.7468,45.2425,1.0442,-
 Flowers102,FedAvg,flowers_fedavg_cnn,0,41,30.1503,40,28.5507,30.1503,1.8192,-
+Flowers102,FedAvg,flowers_fedavg_cnn_jr0.1,0,41,25.2545,36,23.6452,23.8003,2.7229,-
 Flowers102,Fedpkda,flowers_fedpkda_cnn,0,41,36.6457,40,35.5308,36.6457,0.8296,-
+Flowers102,Fedpkda,flowers_fedpkda_cnn_jr0.1,0,41,33.3010,40,32.9035,33.3010,1.0797,-
 NSLKDD,FedAvg,nslkdd_fedavg_dnn,0,61,99.3456,36,95.1822,96.6445,0.0906,-
+NSLKDD,FedAvg,nslkdd_fedavg_dnn_jr0.1,0,61,94.0861,55,55.3147,53.3892,3.3025,-
 NSLKDD,FedAvg,nslkdd_fedavg_dnn_jr0.2,0,61,93.7226,17,67.3606,55.0184,1.7703,-
 NSLKDD,FedAvg,nslkdd_fedavg_dnn_lr5e-3,0,61,99.4668,46,96.6143,97.6759,0.0719,-
 NSLKDD,Fedpkda,nslkdd_fedpkda_dnn,0,61,99.6849,57,99.6828,99.6795,0.0104,-
+NSLKDD,Fedpkda,nslkdd_fedpkda_dnn_jr0.1,0,61,99.6688,43,99.6634,99.6607,0.0117,-
 NSLKDD,Fedpkda,nslkdd_fedpkda_dnn_jr0.2,0,61,99.6822,43,99.6709,99.6661,0.0112,-
 NSLKDD,Fedpkda,nslkdd_fedpkda_dnn_lr5e-3,0,61,99.7495,58,99.7474,99.7495,0.0064,-

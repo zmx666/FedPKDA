@@ -9,9 +9,14 @@
 
 产物 (均在 output/):
     report.md            简单实验报告 (数据驱动的观察 + 每数据集汇总表)
-    acc_by_round.png     按数据集分 3 个子图, 每子图画出各实验的
-                         轮数-精度曲线, 附 ±std 误差带
+    fig_{dataset}_accuracy.png   每个数据集一张图: 轮数-精度曲线 (mean ± std)
     experiment_summary.csv / curves.csv  汇总表与曲线表副本
+
+绘图约定 (按需求: 每张图只保留两种颜色, 每种方法一种颜色):
+    - FedAvg    → 蓝色  #1f77b4
+    - Fedpkda   → 红色  #d62728
+    - 同一方法的参数变体 (lr / jr / 原型权重) 共享同色, 用线型区分: 实线/虚线/点线/点划线
+    - std 误差带用同色半透明填充
 
 std 说明: 当前每组实验均为单次运行 (run=0), 不存在 run 间方差;
 图中误差带取自训练日志里每轮打印的「Std Test Accurancy」(各客户端
@@ -32,9 +37,24 @@ from load_results import RESULTS_DIR, load_results
 OUTPUT_DIR = os.path.join("..", "output")
 SUMMARY_CSV = os.path.join(RESULTS_DIR, "experiment_summary.csv")
 REPORT_PATH = os.path.join(OUTPUT_DIR, "report.md")
-FIG_PATH = os.path.join(OUTPUT_DIR, "acc_by_round.png")
 
 STD_LOG_PATTERN = re.compile(r"^\s*Std Test Accurancy:\s*([0-9.]+)")
+
+METHOD_COLORS = {
+    "fedavg": "#1f77b4",   # 蓝
+    "fedpkda": "#d62728",  # 红
+}
+LINESTYLES = ["-", "--", ":", "-."]
+
+
+def method_of(goal):
+    """从 goal 判断方法 (fedavg / fedpkda / None)。"""
+    g = goal.lower()
+    if "fedavg" in g:
+        return "fedavg"
+    if "fedpkda" in g:
+        return "fedpkda"
+    return None
 
 
 def parse_log_std(goal):
@@ -77,28 +97,38 @@ def build_curves(df):
 
 
 def plot_curves(curves):
+    """每个数据集一张图; 每图仅两种颜色 (每方法一种), 变体用线型区分。"""
     datasets = list(OrderedDict.fromkeys(ds for (ds, _) in curves))
-    fig, axes = plt.subplots(1, len(datasets), figsize=(6.2 * len(datasets), 5), squeeze=False)
-    for ax, ds in zip(axes[0], datasets):
-        for (gds, goal), (rounds, mean, std) in curves.items():
-            if gds != ds:
-                continue
-            y = mean * 100.0
-            ax.plot(rounds, y, label=goal, linewidth=1.6)
-            if std is not None:
-                lo = np.clip((mean - std) * 100.0, 0, 100)
-                hi = np.clip((mean + std) * 100.0, 0, 100)
-                ax.fill_between(rounds, lo, hi, alpha=0.22)
-        ax.set_title(ds, fontsize=13)
+    fig_paths = []
+    for ds in datasets:
+        fig, ax = plt.subplots(figsize=(9, 5.5))
+        for method, color in METHOD_COLORS.items():
+            styles = iter(LINESTYLES)
+            for (gds, goal), (rounds, mean, std) in curves.items():
+                if gds != ds or method_of(goal) != method:
+                    continue
+                ls = next(styles)
+                y = mean * 100.0
+                ax.plot(rounds, y, color=color, linestyle=ls, linewidth=1.8, label=goal)
+                if std is not None:
+                    lo = np.clip((mean - std) * 100.0, 0, 100)
+                    hi = np.clip((mean + std) * 100.0, 0, 100)
+                    ax.fill_between(rounds, lo, hi, color=color, alpha=0.18, linewidth=0)
+        ax.set_title(f"{ds}: Round vs Test Accuracy (mean ± std)", fontsize=13)
         ax.set_xlabel("Round")
+        ax.set_ylabel("Test Accuracy (%)")
         ax.grid(alpha=0.3)
-        ax.legend(fontsize=8)
-    axes[0][0].set_ylabel("Test Accuracy (%)")
-    fig.suptitle("Round vs Test Accuracy (mean ± std)", fontsize=14)
-    fig.tight_layout()
-    fig.savefig(FIG_PATH, dpi=150)
-    plt.close(fig)
-    return FIG_PATH
+        ax.legend(fontsize=8, ncol=2)
+        # 图例下方注明颜色/线型含义
+        ax.text(0.0, -0.14,
+                "Blue = FedAvg, Red = Fedpkda; line styles = parameter variants (solid = baseline)",
+                transform=ax.transAxes, fontsize=8, color="gray")
+        fig.tight_layout()
+        path = os.path.join(OUTPUT_DIR, f"fig_{ds}_accuracy.png")
+        fig.savefig(path, dpi=150)
+        plt.close(fig)
+        fig_paths.append(path)
+    return fig_paths
 
 
 def read_summary():
@@ -108,12 +138,11 @@ def read_summary():
         for row in csv.DictReader(f):
             if row["run"] == "ALL":
                 continue
-            key = (row["dataset"], row["goal"])
-            out[key] = {k: v for k, v in row.items()}
+            out[(row["dataset"], row["goal"])] = {k: v for k, v in row.items()}
     return out
 
 
-def write_report(curves, summary):
+def write_report(curves, summary, fig_paths):
     lines = []
     A = lines.append
     A("# FedPKDA 实验报告\n")
@@ -146,35 +175,52 @@ def write_report(curves, summary):
 
     A("## 关键观察\n")
     obs = []
-    # Flowers102: Fedpkda vs FedAvg 同条件对比
-    for ds in ("Flowers102", "NSLKDD"):
-        pkda = [float(s["best_acc_pct"]) for k, s in summary.items() if k[0] == ds and "fedpkda" in k[1]]
-        avg = [float(s["best_acc_pct"]) for k, s in summary.items() if k[0] == ds and "fedavg" in k[1]]
+    # 1) 各数据集方法对比: Fedpkda vs FedAvg (各取最优变体)
+    for ds in datasets:
+        pkda = [float(s["best_acc_pct"]) for k, s in summary.items()
+                if k[0] == ds and "fedpkda" in k[1].lower()]
+        avg = [float(s["best_acc_pct"]) for k, s in summary.items()
+               if k[0] == ds and "fedavg" in k[1].lower()]
         if pkda and avg:
-            obs.append(f"- **{ds}**: Fedpkda 最优 {max(pkda):.2f}% vs FedAvg 最优 {max(avg):.2f}%,"
-                       f" 差距 {max(pkda) - max(avg):.2f}pp。")
-    # NSLKDD: jr 与 lr 敏感性
-    if any(k[0] == "NSLKDD" and k[1].endswith("_jr0.2") for k in summary):
-        fpkda_jr = float(summary[("NSLKDD", "nslkdd_fedpkda_dnn_jr0.2")]["best_acc_pct"])
-        favg_jr = float(summary[("NSLKDD", "nslkdd_fedavg_dnn_jr0.2")]["best_acc_pct"])
-        favg_jr_final = float(summary[("NSLKDD", "nslkdd_fedavg_dnn_jr0.2")]["final_acc_pct"])
-        obs.append(f"- **NSLKDD join_ratio 敏感性**: jr=0.2 时 Fedpkda 仍保持 {fpkda_jr:.2f}%,"
-                   f" 而 FedAvg 掉到 {favg_jr:.2f}% (最终轮仅 {favg_jr_final:.2f}%),"
-                   " 说明 Fedpkda 在客户端稀疏参与时更稳健。")
-    if any(k[0] == "NSLKDD" and k[1].endswith("_lr5e-3") for k in summary):
-        fpkda_lr = float(summary[("NSLKDD", "nslkdd_fedpkda_dnn_lr5e-3")]["best_acc_pct"])
-        fpkda_base = float(summary[("NSLKDD", "nslkdd_fedpkda_dnn")]["best_acc_pct"])
-        obs.append(f"- **NSLKDD 学习率**: lr=5e-3 比 lr=1e-3 略优 (Fedpkda {fpkda_lr:.2f}% vs {fpkda_base:.2f}%)。")
-    if any(k[0] == "Cifar100" for k in summary):
-        best = max(((k, float(s["best_acc_pct"])) for k, s in summary.items() if k[0] == "Cifar100"),
-                   key=lambda t: t[1])
-        obs.append(f"- **Cifar100**: 两个原型对齐权重设置 (lp0.3/gp0.5 与 lp0.6/gp0.3) 精度接近,"
-                   f" 最优 {best[1]:.2f}%, 对齐权重敏感性不高。")
+            diff = max(pkda) - max(avg)
+            obs.append(f"- **{ds}** 方法对比: Fedpkda 最优 {max(pkda):.2f}% vs "
+                       f"FedAvg 最优 {max(avg):.2f}%, 差距 {diff:+.2f}pp。")
+    # 2) 稀疏参与 (jr) 敏感性: 取每个数据集上最极端的 jr 变体对比
+    for ds in datasets:
+        jr_map = {}
+        for k, s in summary.items():
+            if k[0] != ds or "_jr" not in k[1]:
+                continue
+            base, jr = k[1].split("_jr", 1)
+            jr_map.setdefault(jr, []).append((base, float(s["best_acc_pct"])))
+        if not jr_map:
+            continue
+        most_extreme = sorted(jr_map.keys(), key=float)[0]
+        pkda = [v for _, v in jr_map[most_extreme] if "fedpkda" in _.lower()]
+        avg = [v for _, v in jr_map[most_extreme] if "fedavg" in _.lower()]
+        if pkda and avg:
+            diff = max(pkda) - max(avg)
+            obs.append(f"- **{ds} 稀疏参与敏感性** (jr={most_extreme}): Fedpkda "
+                       f"{max(pkda):.2f}% vs FedAvg {max(avg):.2f}%, 差距 {diff:+.2f}pp。")
+    # 3) Cifar100 原型对齐权重
+    if any(k[0] == "Cifar100" and "lp" in k[1] for k in summary):
+        best = max(((k, float(s["best_acc_pct"])) for k, s in summary.items()
+                    if k[0] == "Cifar100" and "lp" in k[1]), key=lambda t: t[1])
+        obs.append(f"- **Cifar100 原型对齐权重**: lp/gp 两种设置精度接近, "
+                   f"最优 {best[1]:.2f}%, 权重敏感性不高。")
+    # 4) NSLKDD 学习率
+    if any(k[0] == "NSLKDD" and k[1].endswith("_lr5e-3") and "fedpkda" in k[1] for k in summary):
+        pk = float(summary[("NSLKDD", "nslkdd_fedpkda_dnn_lr5e-3")]["best_acc_pct"])
+        base = float(summary[("NSLKDD", "nslkdd_fedpkda_dnn")]["best_acc_pct"])
+        obs.append(f"- **NSLKDD 学习率**: lr=5e-3 比 lr=1e-3 略优 (Fedpkda {pk:.2f}% vs {base:.2f}%)。")
     A("\n".join(obs) if obs else "- (暂无自动生成的观察)")
     A("")
 
     A("## 图像\n")
-    A("- `acc_by_round.png`: 轮数-精度曲线 (mean ± std), 按数据集分子图。\n")
+    for p in fig_paths:
+        A(f"- `{os.path.basename(p)}`")
+    A("\n绘图约定: 蓝色=FedAvg, 红色=Fedpkda; 同色不同线型为参数变体"
+      "(实线为基准配置); 误差带为 ±std。\n")
     A("## 复现\n")
     A("1. 训练: 编辑 `run_experiments.sh` 的 `EXPERIMENTS` 后 `./run_experiments.sh`;")
     A("2. 汇总: `cd system && python summarize_results.py`;")
@@ -192,16 +238,18 @@ def main():
     if not curves:
         print("results/ 下没有可用的实验曲线")
         return
-    fig = plot_curves(curves)
+    fig_paths = plot_curves(curves)
     summary = read_summary()
-    report = write_report(curves, summary)
+    report = write_report(curves, summary, fig_paths)
     # 附上 CSV 副本, 输出目录自包含
     for name in ("experiment_summary.csv", "curves.csv"):
         src = os.path.join(RESULTS_DIR, name)
         if os.path.exists(src):
             with open(src, "rb") as a, open(os.path.join(OUTPUT_DIR, name), "wb") as b:
                 b.write(a.read())
-    print(f"✅ 图像: {fig}")
+    print("✅ 图像:")
+    for p in fig_paths:
+        print(f"   {p}")
     print(f"✅ 报告: {report}")
     print(f"✅ 输出目录: {os.path.abspath(OUTPUT_DIR)}")
 

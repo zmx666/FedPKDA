@@ -40,28 +40,40 @@ SYSTEM_DIR="$ROOT/system"
 RESULTS_DIR="$ROOT/results"
 mkdir -p "$RESULTS_DIR"
 
-# --- 实验列表 (默认提供 8 组示例, 按需增删/注释) ---------------------------
+# --- 实验列表 -----------------------------------------------------------------
 # 格式: "实验名 | main.py 参数"
+# 已跑完的实验保持注释 (防覆盖预检会拦截重跑, 需要重跑请先归档/删除旧 .h5 再取消注释)。
 EXPERIMENTS=(
+    # ==================== 批次 2: 新增实验 (跑完后注释, 数据保留) ====================
+    # ---- Cifar100: 补 FedAvg 基线 (与 Fedpkda 同配置, 不含原型对齐) ----
+    "cifar100_fedavg_cnn| -algo FedAvg -data Cifar100 -m cnn -nc 20 -nb 100 -gr 40 -lr 0.005 -mo 0.1 -lbs 16 -jr 0.2 -ls 5"
+
+    # ---- NSLKDD: 极端稀疏参与 jr=0.1, 拉大两方法区分度 ----
+    "nslkdd_fedpkda_dnn_jr0.1| -algo Fedpkda -data NSLKDD -m dnn -nc 20 -nb 2 -gr 60 -lr 0.001 -mo 0.9 -lbs 16 -jr 0.1 -ls 5"
+    "nslkdd_fedavg_dnn_jr0.1| -algo FedAvg -data NSLKDD -m dnn -nc 20 -nb 2 -gr 60 -lr 0.001 -mo 0.9 -lbs 16 -jr 0.1 -ls 5"
+
+    # ---- Flowers102: 稀疏参与 jr=0.1 ----
+    "flowers_fedpkda_cnn_jr0.1| -algo Fedpkda -data Flowers102 -m cnn -nc 35 -nb 102 -gr 40 -lr 0.005 -mo 0.1 -lbs 16 -jr 0.1 -ls 5"
+    "flowers_fedavg_cnn_jr0.1| -algo FedAvg -data Flowers102 -m cnn -nc 35 -nb 102 -gr 40 -lr 0.005 -mo 0.1 -lbs 16 -jr 0.1 -ls 5"
+
+    # ==================== 批次 1: 已跑完, 数据在 results/ ====================
     # ---- NSLKDD (dnn), 对应原 run.sh 的两条命令 ----
-    # 这两条已跑过, results/ 里已有同名 .h5, 默认注释避免触发防覆盖保护; 想重跑请取消注释
-    "nslkdd_fedpkda_dnn| -algo Fedpkda -data NSLKDD -m dnn -nc 20 -nb 2 -gr 60 -lr 0.001 -mo 0.9 -lbs 16 -jr 0.6 -ls 5"
-    "nslkdd_fedavg_dnn| -algo FedAvg -data NSLKDD -m dnn -nc 20 -nb 2 -gr 60 -lr 0.001 -mo 0.9 -lbs 16 -jr 0.6 -ls 5"
+    # "nslkdd_fedpkda_dnn| -algo Fedpkda -data NSLKDD -m dnn -nc 20 -nb 2 -gr 60 -lr 0.001 -mo 0.9 -lbs 16 -jr 0.6 -ls 5"
+    # "nslkdd_fedavg_dnn| -algo FedAvg -data NSLKDD -m dnn -nc 20 -nb 2 -gr 60 -lr 0.001 -mo 0.9 -lbs 16 -jr 0.6 -ls 5"
 
-    # ---- NSLKDD: Fedpkda 参数敏感性 (lr 与 join_ratio) ----
-    "nslkdd_fedavg_dnn_lr5e-3| -algo FedAvg -data NSLKDD -m dnn -nc 20 -nb 2 -gr 60 -lr 0.005 -mo 0.9 -lbs 16 -jr 0.6 -ls 5"
-    "nslkdd_fedpkda_dnn_lr5e-3| -algo Fedpkda -data NSLKDD -m dnn -nc 20 -nb 2 -gr 60 -lr 0.005 -mo 0.9 -lbs 16 -jr 0.6 -ls 5"
-
-    "nslkdd_fedavg_dnn_jr0.2| -algo FedAvg -data NSLKDD -m dnn -nc 20 -nb 2 -gr 60 -lr 0.001 -mo 0.9 -lbs 16 -jr 0.2 -ls 5"
-    "nslkdd_fedpkda_dnn_jr0.2| -algo Fedpkda -data NSLKDD -m dnn -nc 20 -nb 2 -gr 60 -lr 0.001 -mo 0.9 -lbs 16 -jr 0.2 -ls 5"
+    # ---- NSLKDD: lr 与 join_ratio 敏感性 ----
+    # "nslkdd_fedavg_dnn_lr5e-3| -algo FedAvg -data NSLKDD -m dnn -nc 20 -nb 2 -gr 60 -lr 0.005 -mo 0.9 -lbs 16 -jr 0.6 -ls 5"
+    # "nslkdd_fedpkda_dnn_lr5e-3| -algo Fedpkda -data NSLKDD -m dnn -nc 20 -nb 2 -gr 60 -lr 0.005 -mo 0.9 -lbs 16 -jr 0.6 -ls 5"
+    # "nslkdd_fedavg_dnn_jr0.2| -algo FedAvg -data NSLKDD -m dnn -nc 20 -nb 2 -gr 60 -lr 0.001 -mo 0.9 -lbs 16 -jr 0.2 -ls 5"
+    # "nslkdd_fedpkda_dnn_jr0.2| -algo Fedpkda -data NSLKDD -m dnn -nc 20 -nb 2 -gr 60 -lr 0.001 -mo 0.9 -lbs 16 -jr 0.2 -ls 5"
 
     # ---- Flowers102 (cnn, README 默认数据集, 共 35 个 client) ----
-    "flowers_fedpkda_cnn| -algo Fedpkda -data Flowers102 -m cnn -nc 35 -nb 102 -gr 40 -lr 0.005 -mo 0.1 -lbs 16 -jr 0.2 -ls 5"
-    "flowers_fedavg_cnn| -algo FedAvg -data Flowers102 -m cnn -nc 35 -nb 102 -gr 40 -lr 0.005 -mo 0.1 -lbs 16 -jr 0.2 -ls 5"
+    # "flowers_fedpkda_cnn| -algo Fedpkda -data Flowers102 -m cnn -nc 35 -nb 102 -gr 40 -lr 0.005 -mo 0.1 -lbs 16 -jr 0.2 -ls 5"
+    # "flowers_fedavg_cnn| -algo FedAvg -data Flowers102 -m cnn -nc 35 -nb 102 -gr 40 -lr 0.005 -mo 0.1 -lbs 16 -jr 0.2 -ls 5"
 
     # ---- Cifar100 (cnn), Fedpkda 原型对齐权重不同取值 ----
-    "cifar100_fedpkda_lp0.3_gp0.5| -algo Fedpkda -data Cifar100 -m cnn -nc 20 -nb 100 -gr 40 --local_par 0.3 --global_par 0.5"
-    "cifar100_fedpkda_lp0.6_gp0.3| -algo Fedpkda -data Cifar100 -m cnn -nc 20 -nb 100 -gr 40 --local_par 0.6 --global_par 0.3"
+    # "cifar100_fedpkda_lp0.3_gp0.5| -algo Fedpkda -data Cifar100 -m cnn -nc 20 -nb 100 -gr 40 --local_par 0.3 --global_par 0.5"
+    # "cifar100_fedpkda_lp0.6_gp0.3| -algo Fedpkda -data Cifar100 -m cnn -nc 20 -nb 100 -gr 40 --local_par 0.6 --global_par 0.3"
 )
 
 # --- 工具函数 ---------------------------------------------------------------
@@ -209,7 +221,9 @@ main() {
     echo "    每条实验的曲线: results/*.h5 (可用 summarize_results.py 解析)"
     echo "    每条实验的日志: results/*.log"
     echo "    汇总表:         results/experiment_summary.csv"
-    [ "$FAILED" -gt 0 ] && exit 1
+    if [ "$FAILED" -gt 0 ]; then
+        exit 1
+    fi
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
